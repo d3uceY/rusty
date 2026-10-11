@@ -1,0 +1,53 @@
+const X: i8 = 5;
+const B: i16 = 42;
+
+const NUMBERS: [i16; 6] = [1, 23, 5, 56, 34, 34];
+
+struct Brother<'a> {
+    name: &'a str,
+    nickname: &'a str,
+    age: i8,
+    height: i8,
+}
+
+impl Brother<'_> {
+    fn greet(&self) {
+        println!("hi, my name is {}. What is your name?", self.name);
+    }
+
+    fn is_middle_aged(&self) -> bool {
+        return self.age == 25;
+    }
+
+     fn is_adult(&self) -> bool {
+        return self.age >= 18;
+    }
+}
+
+fn main() {
+    let name: String = String::from("Jesse");
+    let nick_name: String = String::from("Deuce");
+
+    let pr: (&str, i16, i8) = ("bench press", 200, 1);
+
+    let brother = Brother {
+        name: &name,
+        nickname: &nick_name,
+        height: 45,
+        age: 20,
+    };
+
+    println!("{}", X);
+    println!("{}", B);
+    println!("{}", pr.0);
+    println!("{}", pr.1);
+    println!("{}", pr.2);
+
+    println!("{}", brother.is_adult());
+    println!("{}", brother.is_middle_aged());
+    brother.greet();
+
+    for number in NUMBERS {
+        println!("{number}");
+    }
+}
