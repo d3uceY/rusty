@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
+use std::process;
 // use std::io;
 
 // fuck the borrow checker.
@@ -39,7 +40,7 @@ impl Todo {
         File::open(FILEPATH)
     }
 
-    fn remove(todo_num: usize, file_out: &mut File) -> std::io::Result<()> {
+    fn remove(todo_num: usize) -> std::io::Result<()> {
         let file = match File::open(FILEPATH) {
             Ok(f) => f,
             Err(e) => {
@@ -58,13 +59,14 @@ impl Todo {
 
         todos.remove(todo_num - 1);
 
-        let writer = BufWriter::new(file_out);
+        let file = OpenOptions::new().write(true).truncate(true).open(FILEPATH)?;
+        let writer = BufWriter::new(file);
         serde_json::to_writer(writer, &todos)?;
         println!("todo number {} has been removed", todo_num);
         Ok(())
     }
 
-    fn done(todo_num: usize, file_out: &mut File) -> std::io::Result<()> {
+    fn done(todo_num: usize) -> std::io::Result<()> {
         let file = match File::open(FILEPATH) {
             Ok(f) => f,
             Err(e) => {
@@ -83,13 +85,14 @@ impl Todo {
 
         todos[todo_num - 1].done = true;
 
-        let writer = BufWriter::new(file_out);
+        let file = OpenOptions::new().write(true).truncate(true).open(FILEPATH)?;
+        let writer = BufWriter::new(file);
         serde_json::to_writer(writer, &todos)?;
         println!("todo number {} is done", todo_num);
         Ok(())
     }
 
-    fn add_todo(new_todo: Todo, file_out: &mut File) -> std::io::Result<()> {
+    fn add_todo(new_todo: Todo) -> std::io::Result<()> {
         let file = match File::open(FILEPATH) {
             Ok(f) => f,
             Err(e) => {
@@ -107,8 +110,9 @@ impl Todo {
             }
         };
         existing.push(new_todo);
-        let mut writer = BufWriter::new(file_out);
-        serde_json::to_writer(&mut writer, &existing)?;
+        let file = OpenOptions::new().write(true).truncate(true).open(FILEPATH)?;
+        let writer = BufWriter::new(file);
+        serde_json::to_writer(writer, &existing)?;
         println!("{} added to todos", task);
         Ok(())
     }
@@ -130,10 +134,15 @@ impl Todo {
             }
         };
 
+        if todos.is_empty() {
+            println!("Hit the road duuudeee. No todos found");
+            return;
+        }
+
         for (index, todo) in todos.iter().enumerate() {
             let done_marker: &str;
 
-            if (todo.done == true) {
+            if todo.done == true {
                 done_marker = "done"
             } else {
                 done_marker = ""
@@ -142,37 +151,28 @@ impl Todo {
         }
     }
 
-    fn purge() -> std::io::Result<File> {
-        let file = File::create(FILEPATH);
-        let writer: BufWriter<&File>;
-
-        match &file {
-            Ok(f) => {
-                writer = BufWriter::new(f);
-            }
-            Err(e) => {
-                eprintln!("could not open {FILEPATH}: {e}");
-                std::process::exit(1);
-            }
-        }
+    fn purge() -> std::io::Result<()> {
+        let file = File::create(FILEPATH)?;
+        let writer = BufWriter::new(file);
         serde_json::to_writer(writer, &Vec::<Todo>::new())?;
         println!("the purggeeeeee!!!");
-        return file;
+        Ok(())
+    }
+}
+
+fn check(result: std::io::Result<()>) {
+    if let Err(e) = result {
+        eprintln!("{FILEPATH}: {e}");
+        process::exit(1);
     }
 }
 
 fn main() {
-    let mut file_out: File;
-    // initialize the json path
-    match Todo::initialize_json() {
-        Ok(f) => file_out = f,
-        Err(e) => {
-            eprintln!("could not open {FILEPATH}: {e}");
-            std::process::exit(1);
-        }
+    // make sure the file exists
+    if let Err(e) = Todo::initialize_json() {
+        eprintln!("could not open {FILEPATH}: {e}");
+        std::process::exit(1);
     }
-
-    // drop(file_out);
 
     // all za arguments
     let mut all_args: HashMap<&str, &str> = HashMap::new();
@@ -209,7 +209,7 @@ fn main() {
                     task: arg2,
                     done: false,
                 };
-                _ = Todo::add_todo(new_todo, &mut file_out);
+                check(Todo::add_todo(new_todo));
             }
         }
 
@@ -218,7 +218,7 @@ fn main() {
         }
 
         // the purgggggeeee
-        Some("purge") => _ = Todo::purge(),
+        Some("purge") => check(Todo::purge()),
 
         // remove this P
         Some("remove") => {
@@ -236,7 +236,7 @@ fn main() {
                     .parse()
                     .expect("Todo ID must be a number");
 
-                _ = Todo::remove(arg2, &mut file_out);
+                check(Todo::remove(arg2));
             }
         }
 
@@ -256,7 +256,7 @@ fn main() {
                     .parse()
                     .expect("Todo ID must be a number");
 
-                _ = Todo::done(arg2, &mut file_out);
+                check(Todo::done(arg2));
             }
         }
 
